@@ -13,7 +13,9 @@ export default async function handler(req, res) {
       MPESA_CONSUMER_SECRET,
       MPESA_PASSKEY,
       MPESA_SHORTCODE,
-      MPESA_CALLBACK_URL
+      MPESA_CALLBACK_URL,
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY
     } = process.env;
 
     if (
@@ -21,10 +23,12 @@ export default async function handler(req, res) {
       !MPESA_CONSUMER_SECRET ||
       !MPESA_PASSKEY ||
       !MPESA_SHORTCODE ||
-      !MPESA_CALLBACK_URL
+      !MPESA_CALLBACK_URL ||
+      !SUPABASE_URL ||
+      !SUPABASE_SERVICE_ROLE_KEY
     ) {
       return res.status(500).json({
-        error: "M-PESA configuration is incomplete."
+        error: "Server payment configuration is incomplete."
       });
     }
 
@@ -50,10 +54,6 @@ export default async function handler(req, res) {
     }
 
     const amount = prices[product] * qty;
-    if (amount < 1 || amount > 250000) {
-      return res.status(400).json({ error: "Invalid amount." });
-    }
-
     const digits = String(phone || "").replace(/[\s+()-]/g, "");
     let normalizedPhone = digits;
 
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const timestamp = new Intl.DateTimeFormat("en-GB", {
+    const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Africa/Nairobi",
       year: "numeric",
       month: "2-digit",
@@ -80,22 +80,22 @@ export default async function handler(req, res) {
       hourCycle: "h23"
     }).formatToParts(new Date());
 
-    const dateParts = Object.fromEntries(
-      timestamp.map(({ type, value }) => [type, value])
+    const date = Object.fromEntries(
+      parts.map(({ type, value }) => [type, value])
     );
 
-    const timeStamp =
-      dateParts.year + dateParts.month + dateParts.day +
-      dateParts.hour + dateParts.minute + dateParts.second;
+    const timestamp =
+      date.year + date.month + date.day +
+      date.hour + date.minute + date.second;
 
     const password = Buffer.from(
-      MPESA_SHORTCODE + MPESA_PASSKEY + timeStamp
+      MPESA_SHORTCODE + MPESA_PASSKEY + timestamp
     ).toString("base64");
 
-    const sandbox = "https://sandbox.safaricom.co.ke";
+    const baseUrl = "https://sandbox.safaricom.co.ke";
 
     const authResponse = await fetch(
-      sandbox + "/oauth/v1/generate?grant_type=client_credentials",
+      baseUrl + "/oauth/v1/generate?grant_type=client_credentials",
       {
         headers: {
           Authorization:
@@ -116,7 +116,7 @@ export default async function handler(req, res) {
     }
 
     const stkResponse = await fetch(
-      sandbox + "/mpesa/stkpush/v1/processrequest",
+      baseUrl + "/mpesa/stkpush/v1/processrequest",
       {
         method: "POST",
         headers: {
@@ -126,7 +126,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           BusinessShortCode: MPESA_SHORTCODE,
           Password: password,
-          Timestamp: timeStamp,
+          Timestamp: timestamp,
           TransactionType: "CustomerPayBillOnline",
           Amount: amount,
           PartyA: normalizedPhone,
@@ -141,14 +141,47 @@ export default async function handler(req, res) {
 
     const result = await stkResponse.json();
 
-    if (!stkResponse.ok || result.ResponseCode !== "0") {
+    if (!stkResponse.ok || result.ResponseCode !== "0" ||
+        !result.CheckoutRequestID) {
       return res.status(502).json({
         error: "M-PESA Sandbox did not accept the request."
       });
     }
 
+    const dbResponse = await fetch(
+      SUPABASE_URL.replace(/\/$/, "") +
+        "/rest/v1/mpesa_payments",
+      {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          checkout_request_id: result.CheckoutRequestID,
+          merchant_request_id: result.MerchantRequestID || null,
+          phone_number: normalizedPhone,
+          amount,
+          product_code: product,
+          quantity: qty,
+          status: "pending"
+        })
+      }
+    );
+
+    if (!dbResponse.ok) {
+      console.error("Payment tracking insert failed:", dbResponse.status);
+      return res.status(502).json({
+        error:
+          "The payment prompt may have been sent, but tracking failed. " +
+          "Do not retry immediately; ask the shop to check the payment."
+      });
+    }
+
     return res.status(200).json({
-      message: "Sandbox payment prompt accepted for processing.",
+      message: "Sandbox prompt accepted. Payment is still pending.",
       checkoutRequestId: result.CheckoutRequestID
     });
   } catch {
@@ -157,4 +190,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
