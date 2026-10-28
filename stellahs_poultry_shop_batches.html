@@ -66,7 +66,7 @@ function lost(b){return db.transactions.filter(t=>t.batchId===b.id&&t.type==='de
 function remaining(b){return b.qty-sold(b)-lost(b)}
 function cashIn(b){return db.transactions.filter(t=>t.batchId===b.id&&((t.type==='sale'&&t.paid==='yes')||t.type==='payment')).reduce((a,t)=>a+t.amount,0)}
 function costs(b){return Number(b.cost)+db.transactions.filter(t=>t.batchId===b.id&&t.type==='expense').reduce((a,t)=>a+t.amount,0)}
-function activeBroiler(){return db.batches.find(b=>b`.type==='Broiler'&&remaining(b)>0)}
+function activeBroiler(){return db.batches.find(b=>b.type==='Broiler'&&remaining(b)>0)}
 function render(){
  const active=activeBroiler(); $('tBatch').innerHTML=db.batches.map(b=>`<option value="${esc(b.id)}">${esc(b.id)} — ${esc(b.type)} (${remaining(b)} left)</option>`).join('');
  const broilers=db.batches.filter(b=>b.type==='Broiler'), kien=db.batches.filter(b=>b.type==='Kienyeji');
