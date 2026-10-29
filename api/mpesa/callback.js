@@ -8,29 +8,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    const {
-      MPESA_CONSUMER_KEY,
-      MPESA_CONSUMER_SECRET,
-      MPESA_PASSKEY,
-      MPESA_SHORTCODE,
-      MPESA_CALLBACK_URL,
-      SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY
-    } = process.env;
+   const {
+  MPESA_CONSUMER_KEY,
+  MPESA_CONSUMER_SECRET,
+  MPESA_PASSKEY,
+  MPESA_SHORTCODE,
+  MPESA_CALLBACK_URL,
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY
+} = process.env;
 
-    if (
-      !MPESA_CONSUMER_KEY ||
-      !MPESA_CONSUMER_SECRET ||
-      !MPESA_PASSKEY ||
-      !MPESA_SHORTCODE ||
-      !MPESA_CALLBACK_URL ||
-      !SUPABASE_URL ||
-      !SUPABASE_SERVICE_ROLE_KEY
-    ) {
-      return res.status(500).json({
-        error: "Server payment configuration is incomplete."
-      });
-    }
+if (
+  !MPESA_CONSUMER_KEY ||
+  !MPESA_CONSUMER_SECRET ||
+  !MPESA_PASSKEY ||
+  !MPESA_SHORTCODE ||
+  !MPESA_CALLBACK_URL ||
+  !SUPABASE_URL ||
+  !SUPABASE_SERVICE_ROLE_KEY
+) {
+  return res.status(500).json({
+    error: "Server payment configuration is incomplete."
+  });
+}
 
     const { phone, product, quantity } = req.body || {};
     const qty = Number(quantity);
