@@ -29,8 +29,8 @@ button,select,input{font:inherit}button{cursor:pointer;border:0;border-radius:12
 <form class="card" id="orderForm"><div class="field"><label for="customer" data-i="name">Jina lako</label><input id="customer" required autocomplete="name" placeholder="Mfano: Amina"></div><div class="field"><label for="phone" data-i="phone">Nambari ya simu</label><input id="phone" required type="tel" autocomplete="tel" placeholder="07xx xxx xxx"></div><div class="field"><label for="birdForm">Unataka kuku wa aina gani ya maandalizi? / How should the chicken be prepared?</label><select id="birdForm"><option value="live">Aliye hai / Live chicken</option><option value="dressed">Aliyechinjwa na kutayarishwa / Slaughtered and dressed</option></select></div><div class="field"><label for="method" data-i="fulfil">Unapendelea nini?</label><select id="method"><option value="collect" data-i="collect">Nitachukua mwenyewe</option><option value="delivery" data-i="delivery">Niletewe</option></select></div><div class="field"><label for="area" data-i="area">Eneo / alama ya karibu</label><input id="area" placeholder="Mfano: Thika town"></div><div class="field"><label for="payment" data-i="payment">Njia ya malipo unayopendelea</label><select id="payment"><option value="mpesa">M-PESA</option><option value="cash">Pesa taslimu (thibitisha kwanza)</option><option value="other">Nyingine / tuongee</option></select></div><div class="field"><label for="notes" data-i="notes">Maelezo mengine (si lazima)</label><textarea id="notes" placeholder="Tarehe unayohitaji, ukubwa, n.k."></textarea></div><button class="primary" type="submit" data-i="send">Tengeneza ujumbe wa oda</button><p class="small" data-i="sendNote">Hii itafungua programu ya ujumbe kwenye kifaa chako ikiwa imewekwa. Nambari ya Stellah itaongezwa baada ya kuthibitishwa.</p></form></div><div id="result" class="notice" hidden aria-live="polite"></div></section>
 <section class="wrap"><h2 data-i="howTitle">Jinsi ya kununua</h2><div class="steps"><div class="step"><strong>1. <span data-i="step1Title">Chagua</span></strong><span data-i="step1">Weka idadi ya kuku unaotaka.</span></div><div class="step"><strong>2. <span data-i="step2Title">Tuma oda</span></strong><span data-i="step2">Jaza jina na simu; ombi litatengenezwa.</span></div><div class="step"><strong>3. <span data-i="step3Title">Thibitisha</span></strong><span data-i="step3">Subiri Stellah athibitishe stock, jumla na malipo.</span></div></div></section>
 <section class="wrap" id="account" style="padding-top:10px">
-  <h2>Staff login • Kuingia kwa wafanyakazi</h2>
-  <form id="staffLoginForm">
+  <h2 id="staffLoginHeading">Staff login • Kuingia kwa wafanyakazi</h2>
+  
     <label for="staffEmail">Email</label>
     <input id="staffEmail" type="email" required autocomplete="username">
 
@@ -115,6 +115,7 @@ render();
 </script>
   <script>
   const staffLoginForm = document.getElementById("staffLoginForm");
+    const staffLoginHeading = document.getElementById("staffLoginHeading");
   const staffLoginMessage = document.getElementById("loginMessage");
   const staffLogout = document.getElementById("staffLogout");
   const recordsSection = document.getElementById("records");
@@ -125,20 +126,23 @@ render();
       .select("role, full_name")
       .eq("id", user.id)
       .maybeSingle();
-
-    if (error || !profile || profile.role !== "admin") {
-      await supabaseClient.auth.signOut();
-      recordsSection.hidden = true;
-      staffLoginForm.hidden = false;
-      staffLogout.hidden = true;
-      staffLoginMessage.textContent =
-        "Access denied. Admin account required.";
-      return;
-    }
+if (error || !profile || profile.role !== "admin") {
+  await supabaseClient.auth.signOut();
+  recordsSection.hidden = true;
+  staffLoginForm.hidden = false;
+  staffLoginHeading.hidden = false;
+  staffLogout.hidden = true;
+  staffLoginMessage.textContent =
+    "Access denied. Admin account required.";
+  return;
+}
+    
 
     recordsSection.hidden = false;
     staffLoginForm.hidden = true;
+    staffLoginHeading.hidden = true;
     staffLogout.hidden = false;
+    
     staffLoginMessage.textContent =
       "Welcome, " + (profile.full_name || "Stellah") + "!";
   }
@@ -175,6 +179,7 @@ render();
 
     recordsSection.hidden = true;
     staffLoginForm.hidden = false;
+    staffLoginHeading.hidden = false;
     staffLogout.hidden = true;
     staffLoginForm.reset();
     staffLoginMessage.textContent = "You have logged out.";
