@@ -87,7 +87,45 @@ function render(){
  $('batchSummary').innerHTML=`<p><b>Broiler active batch:</b> ${active?esc(active.id)+' — '+remaining(active)+' birds remaining':'No open broiler batch'}</p><p><b>Next broiler batch:</b> ${active?'Blocked until '+esc(active.id)+' is cleared':'Allowed (no open batch)'}</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Batch</th><th>Type</th><th>Started</th><th>Bought</th><th>Sold</th><th>Losses</th><th>Remaining</th><th>Cash received</th><th>Recorded costs</th><th>Status</th></tr></thead><tbody>${db.batches.map(b=>`<tr><td>${esc(b.id)}</td><td>${esc(b.type)}</td><td>${esc(b.date)}</td><td>${b.qty}</td><td>${sold(b)}</td><td>${lost(b)}</td><td>${remaining(b)}</td><td>KSh ${cashIn(b).toFixed(2)}</td><td>KSh ${costs(b).toFixed(2)}</td><td>${remaining(b)===0?'Closed':'Open'}</td></tr>`).join('')||'<tr><td colspan="10">No batches recorded yet.</td></tr>'}</tbody></table></div><p><b>Kienyeji:</b> ${kien.length} separate batch(es) • <b>Broiler:</b> ${broilers.length} batch(es)</p>`;
  $('txnTable').innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Date</th><th>Batch</th><th>Type</th><th>Birds</th><th>Amount</th><th>Cash?</th><th>Details</th></tr></thead><tbody>'+db.transactions.slice().reverse().map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.batchId)}</td><td>${esc(t.type)}</td><td>${t.qty}</td><td>KSh ${Number(t.amount).toFixed(2)}</td><td>${t.paid==='yes'?'Yes':'No'}</td><td>${esc(t.category)}</td></tr>`).join('')+'</tbody></table></div>';
 }
-$('batchForm').addEventListener('submit', async e => {
+window.loadPoultryBatches = async function loadPoultryBatches() {
+  const msg = $('batchMsg');
+  msg.textContent = 'Loading batches from database...';
+
+  const { data, error } = await supabaseClient
+    .from('poultry_batches')
+    .select('id,batch_code,bird_type,chicks_purchased,purchase_date,notes')
+    .order('id', { ascending: true });
+
+  if (error) {
+    msg.textContent = 'Could not load batches: ' + error.message;
+    return;
+  }
+
+  const { data: expenses, error: expenseError } = await supabaseClient
+    .from('expenses')
+    .select('batch_id,amount,expense_category');
+
+  if (expenseError) {
+    msg.textContent = 'Could not load batch costs: ' + expenseError.message;
+    return;
+  }
+
+  db.batches = data.map(row => ({
+    id: row.batch_code,
+    dbId: row.id,
+    type: row.bird_type === 'broiler' ? 'Broiler' : 'Kienyeji',
+    date: row.purchase_date,
+    qty: row.chicks_purchased,
+    cost: (expenses || [])
+      .filter(x => x.batch_id === row.id && x.expense_category === 'chicks')
+      .reduce((sum, x) => sum + Number(x.amount), 0),
+    note: row.notes || ''
+  }));
+
+  save();
+  msg.textContent = db.batches.length + ' batch(es) loaded successfully.';
+}
+  $('batchForm').addEventListener('submit', async e => {
   e.preventDefault();
 
   const type = $('bType').value;
@@ -406,6 +444,7 @@ if (error || !profile || profile.role !== "admin") {
     staffLoginMessage.textContent =
       "Welcome, " + (profile.full_name || "Stellah") + "!";
   }
+    await window.loadPoultryBatches();
 
   staffLoginForm.addEventListener("submit", async function(event) {
     event.preventDefault();
