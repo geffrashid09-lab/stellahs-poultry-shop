@@ -188,7 +188,167 @@ $('batchForm').addEventListener('submit', async e => {
   e.target.reset();
   $('bDate').value = today;
 });
-$('txnForm').addEventListener('submit',e=>{e.preventDefault();const b=db.batches.find(x=>x.id===$('tBatch').value);if(!b){$('txnMsg').textContent='Create a batch first.';return;}const type=$('tType').value,qty=Number($('tQty').value),amount=Number($('tAmount').value);if(qty<0||amount<0){$('txnMsg').textContent='Quantity and amount must not be negative.';return;}if((type==='sale'||type==='death')&&(!Number.isInteger(qty)||qty<1)){ $('txnMsg').textContent='Enter at least 1 bird sold/lost.';return;}if(type==='sale'&&qty>remaining(b)){$('txnMsg').textContent='Sale exceeds remaining stock ('+remaining(b)+').';return;}if(type==='death'&&qty>remaining(b)){$('txnMsg').textContent='Loss exceeds remaining stock ('+remaining(b)+').';return;}if(type==='expense'&&qty!==0){$('txnMsg').textContent='For expenses, set bird quantity to 0.';return;}if(type==='payment'&&amount===0){$('txnMsg').textContent='Enter the payment amount received.';return;}db.transactions.push({id:Date.now().toString(),date:$('tDate').value,batchId:b.id,type,qty:(type==='sale'||type==='death')?qty:0,amount,paid:$('tPaid').value,category:$('tCategory').value});save();$('txnMsg').textContent='Record saved.';e.target.reset();$('tDate').value=today;$('tQty').value='0';$('tAmount').value='0';});
+$('txnForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const msg = $('txnMsg');
+  const type = $('tType').value;
+  const qty = Number($('tQty').value);
+  const amount = Number($('tAmount').value);
+  const date = $('tDate').value;
+  const details = $('tCategory').value.trim();
+
+  if (!supabaseClient) {
+    msg.textContent = 'Database connection is not ready.';
+    return;
+  }
+
+  if (!date || !Number.isFinite(qty) || !Number.isFinite(amount) ||
+      qty < 0 || amount < 0) {
+    msg.textContent = 'Check the date, quantity and amount.';
+    return;
+  }
+
+  if (type === 'payment') {
+    msg.textContent = 'Payment updates need their own secure step. Do not save this as a new sale.';
+    return;
+  }
+
+  if ((type === 'sale' || type === 'death') &&
+      (!Number.isInteger(qty) || qty < 1)) {
+    msg.textContent = 'Enter at least 1 bird sold or lost.';
+    return;
+  }
+
+  if (type === 'expense' && (qty !== 0 || amount <= 0)) {
+    msg.textContent = 'For expenses, set birds to 0 and enter an amount above 0.';
+    return;
+  }
+
+  if (type === 'sale' && amount <= 0) {
+    msg.textContent = 'Enter the total sale amount.';
+    return;
+  }
+
+  const { data: userResult, error: userError } =
+    await supabaseClient.auth.getUser();
+
+  if (userError || !userResult.user) {
+    msg.textContent = 'Please sign in again.';
+    return;
+  }
+
+  const localBatch = db.batches.find(
+    x => x.id === $('tBatch').value
+  );
+
+  if (!localBatch) {
+    msg.textContent = 'Select a valid batch.';
+    return;
+  }
+
+  if ((type === 'sale' || type === 'death') && qty > remaining(localBatch)) {
+    msg.textContent = 'Not enough birds remaining in this batch.';
+    return;
+  }
+
+  msg.textContent = 'Saving record...';
+
+  const { data: batch, error: batchError } = await supabaseClient
+    .from('poultry_batches')
+    .select('id,batch_code')
+    .eq('batch_code', localBatch.id)
+    .single();
+
+  if (batchError || !batch) {
+    msg.textContent = 'Could not find this batch in the database.';
+    return;
+  }
+
+  const userId = userResult.user.id;
+
+  if (type === 'sale') {
+    const { data: sale, error: saleError } = await supabaseClient
+      .from('sales')
+      .insert({
+        batch_id: batch.id,
+        quantity: qty,
+        unit_price: amount / qty,
+        total_amount: amount,
+        amount_received: $('tPaid').value === 'yes' ? amount : 0,
+        sale_date: date,
+        notes: details || null,
+        recorded_by: userId
+      })
+      .select('id')
+      .single();
+
+    if (saleError) {
+      msg.textContent = 'Sale was not saved: ' + saleError.message;
+      return;
+    }
+
+    const { error: movementError } = await supabaseClient
+      .from('stock_movements')
+      .insert({
+        batch_id: batch.id,
+        movement_type: 'sale',
+        quantity: qty,
+        movement_date: date,
+        notes: details || 'Bird sale',
+        recorded_by: userId
+      });
+
+    if (movementError) {
+      msg.textContent = 'Sale saved, but stock update failed. Please contact the administrator. ' + movementError.message;
+      return;
+    }
+  }
+
+  if (type === 'death') {
+    const { error } = await supabaseClient
+      .from('stock_movements')
+      .insert({
+        batch_id: batch.id,
+        movement_type: 'death',
+        quantity: qty,
+        movement_date: date,
+        notes: details || 'Bird loss',
+        recorded_by: userId
+      });
+
+    if (error) {
+      msg.textContent = 'Loss record was not saved: ' + error.message;
+      return;
+    }
+  }
+
+  if (type === 'expense') {
+    const allowed = ['chicks', 'feed', 'medicine', 'transport', 'labour'];
+    const category = details.toLowerCase();
+    const { error } = await supabaseClient
+      .from('expenses')
+      .insert({
+        batch_id: batch.id,
+        expense_category: allowed.includes(category) ? category : 'other',
+        amount,
+        expense_date: date,
+        description: details || 'Other expense',
+        recorded_by: userId
+      });
+
+    if (error) {
+      msg.textContent = 'Expense was not saved: ' + error.message;
+      return;
+    }
+  }
+
+  msg.textContent = 'Record saved successfully.';
+  e.target.reset();
+  $('tDate').value = today;
+  $('tQty').value = '0';
+  $('tAmount').value = '0';
+});
 function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('exportJson').onclick=()=>download('stellah-poultry-backup.json',JSON.stringify(db,null,2),'application/json');
 $('exportCsv').onclick=()=>{const rows=[['record','id','date','batch','type','quantity','amount_ksh','cash_received','category'],...db.batches.map(b=>['batch',b.id,b.date,b.id,b.type,b.qty,b.cost,'yes',b.note]),...db.transactions.map(t=>['transaction',t.id,t.date,t.batchId,t.type,t.qty,t.amount,t.paid,t.category])];
