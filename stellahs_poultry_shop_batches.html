@@ -442,9 +442,11 @@ if (error || !profile || profile.role !== "admin") {
     staffLogout.hidden = false;
     
     staffLoginMessage.textContent =
-      "Welcome, " + (profile.full_name || "Stellah") + "!";
-  }
-    await window.loadPoultryBatches();
+  "Welcome, " + (profile.full_name || "Stellah") + "!";
+
+await window.loadPoultryBatches();
+}
+
 
   staffLoginForm.addEventListener("submit", async function(event) {
     event.preventDefault();
