@@ -28,8 +28,22 @@ button,select,input{font:inherit}button{cursor:pointer;border:0;border-radius:12
 <section class="wrap"><div class="sectionTitle"><div><h2 data-i="orderTitle">Tuma ombi la oda</h2><p data-i="orderSub">Jaza maelezo rahisi. Oda hii bado si malipo yaliyothibitishwa.</p></div></div><div class="order" style="margin-top:15px"><div class="card"><div id="cart"><p class="small" data-i="empty">Bado hujaongeza kuku kwenye oda.</p></div><p class="total"><span data-i="estimated">Jumla:</span> <span id="total">Bei itathibitishwa</span></p><p class="small" data-i="totalNote">Bei ya mwisho itathibitishwa na Stellah kulingana na aina, ukubwa, idadi na usafirishaji.</p></div>
 <form class="card" id="orderForm"><div class="field"><label for="customer" data-i="name">Jina lako</label><input id="customer" required autocomplete="name" placeholder="Mfano: Amina"></div><div class="field"><label for="phone" data-i="phone">Nambari ya simu</label><input id="phone" required type="tel" autocomplete="tel" placeholder="07xx xxx xxx"></div><div class="field"><label for="birdForm">Unataka kuku wa aina gani ya maandalizi? / How should the chicken be prepared?</label><select id="birdForm"><option value="live">Aliye hai / Live chicken</option><option value="dressed">Aliyechinjwa na kutayarishwa / Slaughtered and dressed</option></select></div><div class="field"><label for="method" data-i="fulfil">Unapendelea nini?</label><select id="method"><option value="collect" data-i="collect">Nitachukua mwenyewe</option><option value="delivery" data-i="delivery">Niletewe</option></select></div><div class="field"><label for="area" data-i="area">Eneo / alama ya karibu</label><input id="area" placeholder="Mfano: Thika town"></div><div class="field"><label for="payment" data-i="payment">Njia ya malipo unayopendelea</label><select id="payment"><option value="mpesa">M-PESA</option><option value="cash">Pesa taslimu (thibitisha kwanza)</option><option value="other">Nyingine / tuongee</option></select></div><div class="field"><label for="notes" data-i="notes">Maelezo mengine (si lazima)</label><textarea id="notes" placeholder="Tarehe unayohitaji, ukubwa, n.k."></textarea></div><button class="primary" type="submit" data-i="send">Tengeneza ujumbe wa oda</button><p class="small" data-i="sendNote">Hii itafungua programu ya ujumbe kwenye kifaa chako ikiwa imewekwa. Nambari ya Stellah itaongezwa baada ya kuthibitishwa.</p></form></div><div id="result" class="notice" hidden aria-live="polite"></div></section>
 <section class="wrap"><h2 data-i="howTitle">Jinsi ya kununua</h2><div class="steps"><div class="step"><strong>1. <span data-i="step1Title">Chagua</span></strong><span data-i="step1">Weka idadi ya kuku unaotaka.</span></div><div class="step"><strong>2. <span data-i="step2Title">Tuma oda</span></strong><span data-i="step2">Jaza jina na simu; ombi litatengenezwa.</span></div><div class="step"><strong>3. <span data-i="step3Title">Thibitisha</span></strong><span data-i="step3">Subiri Stellah athibitishe stock, jumla na malipo.</span></div></div></section>
+<section class="wrap" id="account" style="padding-top:10px">
+  <h2>Staff login • Kuingia kwa wafanyakazi</h2>
+  <form id="staffLoginForm">
+    <label for="staffEmail">Email</label>
+    <input id="staffEmail" type="email" required autocomplete="username">
 
-<section class="wrap" id="records" style="padding-top:10px"><div class="sectionTitle"><div><h2>Business records • Rekodi za biashara</h2><p>Private working register on this browser. Export backups regularly.</p></div></div>
+    <label for="staffPassword">Password</label>
+    <input id="staffPassword" type="password" required autocomplete="current-password">
+
+    <button class="primary" type="submit">Login • Ingia</button>
+    <p id="loginMessage" class="small" role="status" aria-live="polite"></p>
+  </form>
+  <button id="staffLogout" type="button" hidden>Logout • Toka</button>
+</section>
+
+ <section class="wrap" id="records" hidden style="padding-top:10px"><div class="sectionTitle"><div><h2>Business records • Rekodi za biashara</h2><p>Private working register on this browser. Export backups regularly.</p></div></div>
 <div class="notice" style="margin:12px 0">Important: these records are saved in this browser only (not shared online). Do not use this as a cloud database yet. Broiler rule: the next batch is blocked until the active batch is fully sold and all birds are accounted for.</div>
 <div class="card" style="margin-bottom:14px"><h3>1. Start a batch / Anzisha kundi</h3><form id="batchForm" class="steps" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px"><div class="field"><label for="bType">Poultry type</label><select id="bType"><option value="Broiler">Broiler</option><option value="Kienyeji">Kienyeji</option></select></div><div class="field"><label for="bDate">Purchase date</label><input id="bDate" type="date" required></div><div class="field"><label for="bQty">Birds purchased</label><input id="bQty" type="number" min="1" step="1" required></div><div class="field"><label for="bCost">Chick purchase cost (KSh)</label><input id="bCost" type="number" min="0" step="0.01" required></div><div class="field"><label for="bNote">Supplier / notes</label><input id="bNote" maxlength="150"></div><div style="align-self:end"><button class="primary" type="submit">Create batch</button></div></form><p id="batchMsg" class="small" aria-live="polite"></p></div>
 <div class="card" style="margin-bottom:14px"><h3>2. Record sale, loss or expense / Rekodi mauzo, vifo au gharama</h3><form id="txnForm" class="steps" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px"><div class="field"><label for="tDate">Date</label><input id="tDate" type="date" required></div><div class="field"><label for="tBatch">Batch</label><select id="tBatch" required></select></div><div class="field"><label for="tType">Record type</label><select id="tType"><option value="sale">Bird sale</option><option value="death">Death / loss</option><option value="expense">Expense</option><option value="payment">Money received for earlier credit sale</option></select></div><div class="field"><label for="tQty">Birds sold/lost (if applicable)</label><input id="tQty" type="number" min="0" step="1" value="0"></div><div class="field"><label for="tAmount">Amount (KSh)</label><input id="tAmount" type="number" min="0" step="0.01" required value="0"></div><div class="field"><label for="tPaid">Cash received now?</label><select id="tPaid"><option value="yes">Yes</option><option value="no">No — credit / unpaid</option></select></div><div class="field"><label for="tCategory">Category / details</label><input id="tCategory" placeholder="Feed, medicine, customer name…" maxlength="150"></div><div style="align-self:end"><button class="primary" type="submit">Save record</button></div></form><p id="txnMsg" class="small" aria-live="polite"></p></div>
@@ -98,5 +112,82 @@ render();
   );
 
   console.log("Supabase client initialized");
-</script> 
+</script>
+  <script>
+  const staffLoginForm = document.getElementById("staffLoginForm");
+  const staffLoginMessage = document.getElementById("loginMessage");
+  const staffLogout = document.getElementById("staffLogout");
+  const recordsSection = document.getElementById("records");
+
+  async function checkStaffAccess(user) {
+    const { data: profile, error } = await supabaseClient
+      .from("profiles")
+      .select("role, full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error || !profile || profile.role !== "admin") {
+      await supabaseClient.auth.signOut();
+      recordsSection.hidden = true;
+      staffLoginForm.hidden = false;
+      staffLogout.hidden = true;
+      staffLoginMessage.textContent =
+        "Access denied. Admin account required.";
+      return;
+    }
+
+    recordsSection.hidden = false;
+    staffLoginForm.hidden = true;
+    staffLogout.hidden = false;
+    staffLoginMessage.textContent =
+      "Welcome, " + (profile.full_name || "Stellah") + "!";
+  }
+
+  staffLoginForm.addEventListener("submit", async function(event) {
+    event.preventDefault();
+
+    staffLoginMessage.textContent = "Signing in...";
+
+    const email = document.getElementById("staffEmail").value.trim();
+    const password = document.getElementById("staffPassword").value;
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+
+    if (error) {
+      staffLoginMessage.textContent =
+        "Login failed. Check your email and password.";
+      return;
+    }
+
+    await checkStaffAccess(data.user);
+  });
+
+  staffLogout.addEventListener("click", async function() {
+    const { error } = await supabaseClient.auth.signOut();
+
+    if (error) {
+      staffLoginMessage.textContent = "Could not log out. Try again.";
+      return;
+    }
+
+    recordsSection.hidden = true;
+    staffLoginForm.hidden = false;
+    staffLogout.hidden = true;
+    staffLoginForm.reset();
+    staffLoginMessage.textContent = "You have logged out.";
+  });
+
+  async function restoreStaffSession() {
+    const { data, error } = await supabaseClient.auth.getSession();
+
+    if (!error && data.session) {
+      await checkStaffAccess(data.session.user);
+    }
+  }
+
+  restoreStaffSession();
+</script>
 </body></html>
