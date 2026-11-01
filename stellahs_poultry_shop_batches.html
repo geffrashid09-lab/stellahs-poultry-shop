@@ -87,7 +87,107 @@ function render(){
  $('batchSummary').innerHTML=`<p><b>Broiler active batch:</b> ${active?esc(active.id)+' — '+remaining(active)+' birds remaining':'No open broiler batch'}</p><p><b>Next broiler batch:</b> ${active?'Blocked until '+esc(active.id)+' is cleared':'Allowed (no open batch)'}</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Batch</th><th>Type</th><th>Started</th><th>Bought</th><th>Sold</th><th>Losses</th><th>Remaining</th><th>Cash received</th><th>Recorded costs</th><th>Status</th></tr></thead><tbody>${db.batches.map(b=>`<tr><td>${esc(b.id)}</td><td>${esc(b.type)}</td><td>${esc(b.date)}</td><td>${b.qty}</td><td>${sold(b)}</td><td>${lost(b)}</td><td>${remaining(b)}</td><td>KSh ${cashIn(b).toFixed(2)}</td><td>KSh ${costs(b).toFixed(2)}</td><td>${remaining(b)===0?'Closed':'Open'}</td></tr>`).join('')||'<tr><td colspan="10">No batches recorded yet.</td></tr>'}</tbody></table></div><p><b>Kienyeji:</b> ${kien.length} separate batch(es) • <b>Broiler:</b> ${broilers.length} batch(es)</p>`;
  $('txnTable').innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Date</th><th>Batch</th><th>Type</th><th>Birds</th><th>Amount</th><th>Cash?</th><th>Details</th></tr></thead><tbody>'+db.transactions.slice().reverse().map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.batchId)}</td><td>${esc(t.type)}</td><td>${t.qty}</td><td>KSh ${Number(t.amount).toFixed(2)}</td><td>${t.paid==='yes'?'Yes':'No'}</td><td>${esc(t.category)}</td></tr>`).join('')+'</tbody></table></div>';
 }
-$('batchForm').addEventListener('submit',e=>{e.preventDefault();const type=$('bType').value,qty=Number($('bQty').value),cost=Number($('bCost').value);if(type==='Broiler'&&activeBroiler()){ $('batchMsg').textContent='Blocked: '+activeBroiler().id+' still has '+remaining(activeBroiler())+' birds. Finish and account for this batch first.';return;}if(qty<1||!Number.isFinite(cost)||cost<0)return;const n=db.batches.filter(b=>b.type===type).length+1;const id=(type==='Broiler'?'BR':'KI')+'-'+String(n).padStart(3,'0');db.batches.push({id,type,date:$('bDate').value,qty,cost,note:$('bNote').value});save();$('batchMsg').textContent='Batch '+id+' created.';e.target.reset();$('bDate').value=today;});
+$('batchForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const type = $('bType').value;
+  const qty = Number($('bQty').value);
+  const cost = Number($('bCost').value);
+  const date = $('bDate').value;
+  const note = $('bNote').value;
+
+  if (type === 'Broiler' && activeBroiler()) {
+    $('batchMsg').textContent =
+      'Blocked: ' + activeBroiler().id + ' still has ' +
+      remaining(activeBroiler()) +
+      ' birds. Finish and account for this batch first.';
+    return;
+  }
+
+  if (!Number.isInteger(qty) || qty < 1 ||
+      !Number.isFinite(cost) || cost <= 0 || !date) {
+    $('batchMsg').textContent =
+      'Enter a valid quantity, purchase cost and date.';
+    return;
+  }
+
+  const { data: userData, error: userError } =
+    await supabaseClient.auth.getUser();
+
+  if (userError || !userData.user) {
+    $('batchMsg').textContent = 'Please sign in before creating a batch.';
+    return;
+  }
+
+  $('batchMsg').textContent = 'Saving batch to the database...';
+
+  const birdType = type === 'Broiler' ? 'broiler' : 'kienyeji';
+
+  const { data: existing, error: readError } = await supabaseClient
+    .from('poultry_batches')
+    .select('batch_code')
+    .eq('bird_type', birdType);
+
+  if (readError) {
+    $('batchMsg').textContent = 'Could not check existing batches: ' + readError.message;
+    return;
+  }
+
+  const prefix = type === 'Broiler' ? 'BR-' : 'KI-';
+  const highest = (existing || []).reduce((max, row) => {
+    const number = Number((row.batch_code || '').replace(prefix, ''));
+    return Number.isFinite(number) ? Math.max(max, number) : max;
+  }, 0);
+
+  const id = prefix + String(highest + 1).padStart(3, '0');
+
+  const { data: batch, error: batchError } = await supabaseClient
+    .from('poultry_batches')
+    .insert({
+      batch_code: id,
+      bird_type: birdType,
+      chicks_purchased: qty,
+      purchase_date: date,
+      notes: note
+    })
+    .select('id')
+    .single();
+
+  if (batchError) {
+    $('batchMsg').textContent = 'Batch save failed: ' + batchError.message;
+    return;
+  }
+
+  const { error: expenseError } = await supabaseClient
+    .from('expenses')
+    .insert({
+      batch_id: batch.id,
+      expense_category: 'chicks',
+      amount: cost,
+      expense_date: date,
+      description: note || 'Chick purchase for ' + id,
+      recorded_by: userData.user.id
+    });
+
+  if (expenseError) {
+    await supabaseClient
+      .from('poultry_batches')
+      .delete()
+      .eq('id', batch.id);
+
+    $('batchMsg').textContent =
+      'Purchase expense could not be saved. Batch was rolled back: ' +
+      expenseError.message;
+    return;
+  }
+
+  db.batches.push({ id, type, date, qty, cost, note });
+  save();
+
+  $('batchMsg').textContent = 'Batch ' + id + ' saved to Supabase successfully.';
+  e.target.reset();
+  $('bDate').value = today;
+});
 $('txnForm').addEventListener('submit',e=>{e.preventDefault();const b=db.batches.find(x=>x.id===$('tBatch').value);if(!b){$('txnMsg').textContent='Create a batch first.';return;}const type=$('tType').value,qty=Number($('tQty').value),amount=Number($('tAmount').value);if(qty<0||amount<0){$('txnMsg').textContent='Quantity and amount must not be negative.';return;}if((type==='sale'||type==='death')&&(!Number.isInteger(qty)||qty<1)){ $('txnMsg').textContent='Enter at least 1 bird sold/lost.';return;}if(type==='sale'&&qty>remaining(b)){$('txnMsg').textContent='Sale exceeds remaining stock ('+remaining(b)+').';return;}if(type==='death'&&qty>remaining(b)){$('txnMsg').textContent='Loss exceeds remaining stock ('+remaining(b)+').';return;}if(type==='expense'&&qty!==0){$('txnMsg').textContent='For expenses, set bird quantity to 0.';return;}if(type==='payment'&&amount===0){$('txnMsg').textContent='Enter the payment amount received.';return;}db.transactions.push({id:Date.now().toString(),date:$('tDate').value,batchId:b.id,type,qty:(type==='sale'||type==='death')?qty:0,amount,paid:$('tPaid').value,category:$('tCategory').value});save();$('txnMsg').textContent='Record saved.';e.target.reset();$('tDate').value=today;$('tQty').value='0';$('tAmount').value='0';});
 function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('exportJson').onclick=()=>download('stellah-poultry-backup.json',JSON.stringify(db,null,2),'application/json');
